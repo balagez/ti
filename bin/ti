@@ -12,6 +12,8 @@ Usage:
   ti (t|tag) <tag>...
   ti (n|note) <note-text>...
   ti (l|log) [today]
+  ti (list)
+  ti (w|week) [<week>...]
   ti (e|edit)
   ti (i|interrupt)
   ti --no-color
@@ -25,6 +27,8 @@ Options:
                     idea to avoid whitespace.
   <note-text>...    Some arbitrary text to be added as `notes` to the currently
                     working project.
+  <week>...         The week of the year if it's a positive number, the relative week offset if
+                    it's a negative number (e.g. 0 is "this week", -1 is "last week").
 """
 
 from __future__ import print_function
@@ -244,6 +248,74 @@ def action_log(period):
                 end=' ← working\n' if current == name else '\n')
 
 
+def action_week(week):
+    data = store.load()
+    work = data['work'] + data['interrupt_stack']
+    log = defaultdict(lambda: {'delta': timedelta()})
+    current = None
+
+    def week_of(d):
+        return int(d.isocalendar()[1])
+
+    if week > 0:
+        week_to_show = week
+    else:
+        week_to_show = week_of(datetime.now()) + week
+
+    week_of_year = str(datetime.now().year) + '-' + str(week_to_show)
+    week_min_time = datetime.strptime(week_of_year + '-Mon 0:0:0', '%Y-%W-%a %H:%M:%S')
+    week_max_time = datetime.strptime(week_of_year + '-Sun 23:59:59', '%Y-%W-%a %H:%M:%S')
+
+    for item in work:
+        start_time = parse_isotime(item['start'])
+        if 'end' in item:
+            end_time = parse_isotime(item['end'])
+        else:
+            end_time = datetime.utcnow()
+            current = item['name']
+
+        # check whether the work item has an overlapping timeframe with the week to show; note that
+        # either or both ends may spread beyond boundaries of week to show
+        if week_to_show >= week_of(start_time) and week_to_show <= week_of(end_time):
+            # adjust start time if it spreads to the week before
+            if start_time < week_min_time:
+                start_time = week_min_time
+            # adjust end time if it spreads to the week after
+            if end_time > week_max_time:
+                end_time = week_max_time
+
+            log[item['name']]['delta'] += end_time - start_time
+        else:
+            current = None
+
+    name_col_len = 0
+
+    for name, item in log.items():
+        name_col_len = max(name_col_len, len(name))
+
+        secs = item['delta'].seconds
+        tmsg = []
+
+        if secs > 3600:
+            hours = int(secs / 3600)
+            secs -= hours * 3600
+            tmsg.append(str(hours) + ' hour' + ('s' if hours > 1 else ''))
+
+        if secs > 60:
+            mins = int(secs / 60)
+            secs -= mins * 60
+            tmsg.append(str(mins) + ' minute' + ('s' if mins > 1 else ''))
+
+        if secs:
+            tmsg.append(str(secs) + ' second' + ('s' if secs > 1 else ''))
+
+        log[name]['tmsg'] = ', '.join(tmsg)[::-1].replace(',', ' &'[::-1], 1)[::-1]
+
+    for name, item in sorted(log.items(), key=(lambda x: x[1]), reverse=True):
+        print(name.ljust(name_col_len), ' ∙∙ ', item['tmsg'],
+                end=' ← working\n' if current == name else '\n')
+
+
 def action_edit():
     if 'EDITOR' not in os.environ:
         print("Please set the 'EDITOR' environment variable", file=sys.stderr)
@@ -386,6 +458,19 @@ def parse_args(argv=sys.argv):
         args = {
             'name': tail[0],
             'time': to_datetime(' '.join(tail[1:])),
+        }
+
+    elif head in ['w', 'week']:
+        if not tail:
+            week = 0
+        elif tail[0] == 'last':
+            week = -1
+        else:
+            week = int(tail[0])
+
+        fn = action_week
+        args = {
+            'week': week
         }
 
     elif head in ['f', 'fin']:
