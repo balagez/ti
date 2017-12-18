@@ -11,7 +11,7 @@ _ti()
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     opts=$(ti list)
 
-    if [[ "on o" =~ ${prev} ]] ; then
+    if [[ "on o start" =~ ${prev} ]] ; then
         COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
         return 0
     fi

@@ -452,7 +452,7 @@ def parse_args(argv=sys.argv):
         fn = action_edit
         args = {}
 
-    elif head in ['o', 'on']:
+    elif head in ['o', 'on', 'start']:
         if not tail:
             helpful_exit('Need the name of whatever you are working on.')
 
@@ -475,7 +475,7 @@ def parse_args(argv=sys.argv):
             'week': week
         }
 
-    elif head in ['f', 'fin']:
+    elif head in ['f', 'fin', 'stop']:
         fn = action_fin
         args = {'time': to_datetime(' '.join(tail))}
 
