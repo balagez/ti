@@ -263,7 +263,7 @@ def action_week(week):
     else:
         week_to_show = week_of(datetime.now()) + week
 
-    week_of_year = str(datetime.now().year) + '-' + str(week_to_show)
+    week_of_year = str(datetime.now().year) + '-' + str(week_to_show - 1)
     week_min_time = datetime.strptime(week_of_year + '-Mon 0:0:0', '%Y-%W-%a %H:%M:%S')
     week_max_time = datetime.strptime(week_of_year + '-Sun 23:59:59', '%Y-%W-%a %H:%M:%S')
 
